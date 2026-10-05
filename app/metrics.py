@@ -23,6 +23,16 @@ ORDERS_CREATED = Counter(
     "Total orders created",
 )
 
+ORDER_EVENTS_PUBLISHED = Counter(
+    "order_events_published_total",
+    "Total order events successfully published to Kafka",
+)
+
+ORDER_EVENTS_FAILED = Counter(
+    "order_events_failed_total",
+    "Total order events that failed to publish to Kafka",
+)
+
 ACTIVE_REQUESTS = Gauge(
     "http_active_requests",
     "Current number of active HTTP requests",

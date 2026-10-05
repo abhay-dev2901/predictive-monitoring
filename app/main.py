@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .database import Base, SessionLocal, engine, get_db
+from .events import KafkaEventPublisher, build_order_created_event
 from .metrics import (
     ACTIVE_REQUESTS,
     DB_QUERY_LATENCY,
@@ -59,6 +60,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    app.state.event_publisher = KafkaEventPublisher()
 
     # Seed data only when the table is empty.
     with SessionLocal() as db:
@@ -74,6 +76,7 @@ async def lifespan(app: FastAPI):
             db.commit()
 
     yield
+    app.state.event_publisher.close()
 
 
 app = FastAPI(
@@ -132,6 +135,13 @@ def create_order(order: OrderRequest, db: Session = Depends(get_db)):
     )
 
     ORDERS_CREATED.inc()
+    app.state.event_publisher.publish_order_created(
+        build_order_created_event(
+            order_id=new_order.id,
+            product_id=new_order.product_id,
+            quantity=new_order.quantity,
+        )
+    )
 
     return {
         "id": new_order.id,

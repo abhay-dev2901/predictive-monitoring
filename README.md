@@ -1,12 +1,12 @@
-# Predictive Observability Platform — Phase 1
+# Predictive Observability Platform — Phase 2
 
-This is the first step of a larger project:
+This project is moving through a larger observability roadmap:
 
 **Real-time monitoring → anomaly detection → time-series forecasting → incident prediction → AI investigation**
 
-## Phase 1 Goal
+## Current Goal
 
-Build a working monitoring foundation with:
+Build a working monitoring and event-streaming foundation with:
 
 - FastAPI application
 - PostgreSQL
@@ -14,8 +14,32 @@ Build a working monitoring foundation with:
 - Prometheus metrics
 - Grafana
 - Synthetic traffic
+- Kafka event streaming
+- Order event consumer
 
-No Kafka and no ML yet.
+No ML yet. Phase 2 focuses on separating business writes from downstream event processing.
+
+## Architecture
+
+```text
+Synthetic traffic
+  -> FastAPI API
+  -> PostgreSQL
+  -> Kafka topic: orders
+  -> Order consumer
+
+Prometheus
+  -> scrapes FastAPI /metrics
+  -> Grafana dashboards
+```
+
+When an order is created:
+
+1. FastAPI validates the request.
+2. The order is committed to PostgreSQL.
+3. The app publishes an `order.created` event to Kafka.
+4. The order consumer reads the event from Kafka.
+5. Prometheus tracks request, database, order, and Kafka publish metrics.
 
 ## Run
 
@@ -30,6 +54,7 @@ Open:
 - Metrics: http://localhost:8000/metrics
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000
+- Kafka external listener: localhost:9094
 
 Grafana default login:
 
@@ -49,6 +74,20 @@ python3 generate_traffic.py
 ```
 
 Leave it running so Prometheus has telemetry to collect.
+
+## Watch Kafka Events
+
+The `order-consumer` service logs every order event it receives:
+
+```bash
+docker compose logs -f order-consumer
+```
+
+You can also inspect the app logs:
+
+```bash
+docker compose logs -f app
+```
 
 ## Useful Prometheus queries
 
@@ -88,6 +127,18 @@ Orders created:
 rate(orders_created_total[1m])
 ```
 
+Kafka order events published:
+
+```promql
+rate(order_events_published_total[1m])
+```
+
+Kafka publish failures:
+
+```promql
+rate(order_events_failed_total[1m])
+```
+
 Database latency:
 
 ```promql
@@ -107,10 +158,19 @@ rate(db_query_duration_seconds_count[5m])
 - Docker networking
 - Basic production-style observability
 
+## What we learn in Phase 2
+
+- Kafka broker setup
+- Topic-based event streaming
+- Producer/consumer separation
+- Event-driven architecture
+- Decoupling API writes from downstream processing
+- Metrics for event publishing success and failure
+
 ## Next Phase
 
 After this works:
 
-**Phase 2 → Kafka + event streaming**
+**Phase 3 → anomaly detection**
 
-We will not add Kafka until this basic monitoring pipeline is working.
+We will use the monitoring metrics and order event stream as inputs for detecting unusual system or business behavior.
